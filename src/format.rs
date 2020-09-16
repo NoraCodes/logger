@@ -10,7 +10,7 @@ use self::FormatText::{Method, URI, Status, ResponseTime, RemoteAddr, RequestTim
 /// A formatting style for the `Logger`, consisting of multiple
 /// `FormatText`s concatenated into one line.
 #[derive(Clone)]
-pub struct Format(Vec<FormatText>);
+pub struct Format(Vec<FormatText>, bool);
 
 impl Default for Format {
     /// Return the default formatting style for the `Logger`:
@@ -43,7 +43,12 @@ impl Format {
             }
         }
 
-        Some(Format(results))
+        Some(Format(results, false))
+    }
+
+    /// Add surrounding braces to output.
+    pub fn with_surrounding_braces(s: Option<Self>) -> Option<Self> {
+       s.map(|mut s| { s.1 = true; s })
     }
 }
 
@@ -188,9 +193,15 @@ pub struct FormatDisplay<'a> {
 use std::fmt;
 impl<'a> fmt::Display for FormatDisplay<'a> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        let Format(ref format) = *self.format;
+        let Format(ref format, ref with_braces) = *self.format;
+        if *with_braces {
+            write!(fmt, "{{").unwrap();
+        }
         for unit in format {
             (self.render)(fmt, unit)?;
+        }
+        if *with_braces {
+            write!(fmt, "}}").unwrap();
         }
         Ok(())
     }
