@@ -76,6 +76,7 @@ struct FormatParser<'a> {
     // A reusable buffer for parsing style attributes.
     object_buffer: String,
 
+    last_was_backslash: bool,
     finished: bool
 }
 
@@ -87,6 +88,7 @@ impl<'a> FormatParser<'a> {
             // No attributes are longer than 14 characters, so we can avoid reallocating.
             object_buffer: String::with_capacity(14),
 
+            last_was_backslash: false,
             finished: false
         }
     }
@@ -111,6 +113,8 @@ impl<'a> Iterator for FormatParser<'a> {
             //   - {response-time}
             //   - {ip-addr}
             //   - {request-time}
+            //
+            //     Escaped by \{
             Some('{') => {
                 self.object_buffer.clear();
 
@@ -150,9 +154,18 @@ impl<'a> Iterator for FormatParser<'a> {
                 loop {
                     match self.chars.peek() {
                         // Done parsing.
-                        Some(&'{') | None => return Some(Some(FormatText::Str(buffer))),
-
+                        None => return Some(Some(FormatText::Str(buffer))),
+                        Some(&'{') => { if self.last_was_backslash { buffer.push(self.chars.next().unwrap()); } else { return Some(Some(FormatText::Str(buffer))); } }
+                        Some(&'\\') => {
+                            if self.last_was_backslash {
+                                buffer.push(self.chars.next().unwrap());
+                            } else {
+                                self.last_was_backslash;
+                                self.chars.next();
+                            }
+                        }
                         Some(_) => {
+                            self.last_was_backslash = false;
                             buffer.push(self.chars.next().unwrap())
                         }
                     }
